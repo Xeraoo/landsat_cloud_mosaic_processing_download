@@ -1,0 +1,73 @@
+// Definiowanie ROI (narysuj na mapie lub wklej współrzędne)
+var roi = 
+    /* color: #ffc82d */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[17.646204948872047, 54.448373278313674],
+          [17.646204948872047, 53.3217366014553],
+          [18.541590691059547, 53.3217366014553],
+          [18.541590691059547, 54.448373278313674]]], null, false);
+
+// Zakres dat do edycji
+var startDate = '2020-06-01'; // Dopasuj odpowiedni zakres dat dla Landsat 8
+var endDate = '2020-07-31';  // Upewnij się, że dane pokrywają wybrane daty
+
+// Pobranie kolekcji Landsat 8
+var collection = ee.ImageCollection('LANDSAT/LC08/C02/T1_TOA')
+  .filterBounds(roi) // Filtruj według ROI
+  .filterDate(startDate, endDate); // Filtruj według zakresu dat
+
+// Grupowanie według WRS_PATH i WRS_ROW (ścieżki i rzędów satelity)
+var uniqueScenes = collection.distinct(['WRS_PATH', 'WRS_ROW']);
+
+// Dla każdej unikalnej kombinacji WRS_PATH i WRS_ROW wybierz obraz z najmniejszym zachmurzeniem
+var bestImages = uniqueScenes.map(function(scene) {
+  var path = scene.get('WRS_PATH');
+  var row = scene.get('WRS_ROW');
+  var filtered = collection
+    .filter(ee.Filter.eq('WRS_PATH', path))
+    .filter(ee.Filter.eq('WRS_ROW', row))
+    .map(function(image) {
+      var cloudMasked = image.select('QA_PIXEL').bitwiseAnd(1 << 4).eq(0); // Maskowanie chmur
+      var cloudPercentage = cloudMasked.reduceRegion({
+        reducer: ee.Reducer.mean(),
+        geometry: roi,
+        scale: 30,
+        maxPixels: 1e13
+      }).get('QA_PIXEL');
+      return image.set('cloud_percentage_roi', cloudPercentage); // Dodaj zachmurzenie jako atrybut
+    })
+    .sort('cloud_percentage_roi'); // Sortuj według zachmurzenia w ROI
+  return filtered.first(); // Wybierz obraz o najmniejszym zachmurzeniu
+});
+
+// Tworzenie kolekcji z wybranych najlepszych obrazów
+var bestCollection = ee.ImageCollection(bestImages);
+
+// Mozaikowanie obrazów i przycinanie do ROI
+var mosaicImage = bestCollection.mosaic().clip(roi);
+
+// Konwersja pasm do jednego typu (Float32)
+var unifiedImage = mosaicImage.toFloat();
+
+// Ekstrakcja daty zakresu dat (dla opisu pliku)
+var imageRange = startDate + '_to_' + endDate;
+
+// Wyświetl mozaikę w kolorach RGB (opcjonalne podgląd na mapie)
+Map.centerObject(roi, 10);
+Map.addLayer(unifiedImage, {bands: ['B4', 'B3', 'B2'], min: 0, max: 0.3}, 'Mosaic RGB');
+
+// Eksport mozaiki (wszystkie pasma) do Dysku Google
+Export.image.toDrive({
+  image: unifiedImage, // Mozaikowany obraz przycięty do ROI
+  description: 'Landsat8_Mosaic_' + imageRange, // Opis zadania eksportu
+  fileNamePrefix: 'Landsat8_Mosaic_' + imageRange, // Nazwa pliku
+  region: roi, // Obszar eksportu
+  scale: 30, // Rozdzielczość w metrach
+  crs: 'EPSG:4326', // Układ współrzędnych
+  maxPixels: 1e13 // Maksymalna liczba pikseli
+});

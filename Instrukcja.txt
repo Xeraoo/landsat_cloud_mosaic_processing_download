@@ -1,0 +1,22 @@
+Instrukcja obsługi kodu:
+Przygotowanie:
+
+Skopiuj wybrany kod (dla Landsat 5 lub Landsat 8) do edytora w Google Earth Engine (Code Editor).
+Zdefiniuj obszar zainteresowania (ROI) na mapie lub wklej współrzędne w sekcji roi. - W naszym przypadku już zdefiniowane Bory Tucholskie
+Ustawienia dat:
+
+Dla Landsat 5: Zakres dat między March 1984 – May 2012.
+Dla Landsat 8: Zakres dat między April 2013 – Present.
+Nie wybieraj zbyt dużego przedziału czasowego, aby uniknąć długich obliczeń.
+Uruchomienie kodu:
+
+Kliknij Run w Code Editorze.
+Kod:
+Sortuje obrazy w kolekcji według najmniejszej ilości chmur w ROI.
+Tworzy mozaikę z wybranych najlepszych zdjęć.
+Przygotowuje obraz do eksportu.
+Eksport pliku:
+
+W Task Manager (po prawej stronie Code Editora), kliknij Run dla zadania eksportu.
+Plik TIFF zawierający wszystkie pasma spektralne zostanie zapisany na Dysku Google.
+Gotowe! Mozaikę można dalej analizować w wybranym oprogramowaniu GIS.
